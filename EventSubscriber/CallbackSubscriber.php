@@ -268,24 +268,24 @@ class CallbackSubscriber implements EventSubscriberInterface
 
     private function addFailureByAddressCustom(array $payload): void
     {
-        $type = $payload['bounce']['bounceType'];
+        $type     = $payload['bounce']['bounceType'];
         $typeName = 'OTHER';
-        $channel = 'email';
+        $channel  = 'email';
         if ('Permanent' === $type) {
             $typeName = 'HARD';
         } elseif ('Transient' === $type) {
             $typeName = 'SOFT';
-            $channel = 'soft bounce';
+            $channel  = 'soft bounce';
         }
-        $emailId = $this->getEmailHeader($payload);
+        $emailId           = $this->getEmailHeader($payload);
         $bouncedRecipients = $payload['bounce']['bouncedRecipients'];
         foreach ($bouncedRecipients as $bouncedRecipient) {
-            $bounceSubType = $payload['bounce']['bounceSubType'];
+            $bounceSubType    = $payload['bounce']['bounceSubType'];
             $bounceDiagnostic = array_key_exists('diagnosticCode', $bouncedRecipient) ? $bouncedRecipient['diagnosticCode'] : 'unknown';
-            $bounceCode = $typeName.': AWS: '.$bounceSubType.': '.$bounceDiagnostic;
-            $channelWithId = [$channel => $emailId];
-            $this->addFailureByAddress($this->cleanupEmailAddress($bouncedRecipient['emailAddress']),$bounceCode,DoNotContact::BOUNCED,$channelWithId);
-            $this->logger->debug("Mark email '" . $bouncedRecipient['emailAddress'] . "' as bounced, reason: " . $bounceCode);
+            $bounceCode       = $typeName.': AWS: '.$bounceSubType.': '.$bounceDiagnostic;
+            $channelWithId    = [$channel => $emailId];
+            $this->addFailureByAddress($this->cleanupEmailAddress($bouncedRecipient['emailAddress']), $bounceCode, DoNotContact::BOUNCED, $channelWithId);
+            $this->logger->debug("Mark email '".$bouncedRecipient['emailAddress']."' as bounced, reason: ".$bounceCode);
         }
     }
 
@@ -312,18 +312,19 @@ class CallbackSubscriber implements EventSubscriberInterface
 
     private function updateSoftBounceDncEntry(Lead $contact, $channel, int $dncReason, string $comments): void
     {
-        $dncEntities = $contact->getDoNotContact();
-        if ($dncEntities->isEmpty()) {
-            $this->dncModel->addDncForContact($contact->getId(), $channel, $dncReason, $comments);
-
-            return;
-        }
+        $dncEntities       = $contact->getDoNotContact();
+        $softBounceUpdated = false;
         foreach ($dncEntities as $dnc) {
             if ('soft bounce' === $dnc->getChannel()) {
-                $this->dncModel->updateDncRecord($dnc, $contact, 'soft bounce', $channel, $dncReason, $comments);
+                $this->dncModel->updateDncRecord($dnc, $contact, 'soft bounce', $dncReason, $comments);
                 $this->leadModel->saveEntity($contact);
+                $softBounceUpdated = true;
                 break;
             }
+        }
+
+        if (!$softBounceUpdated) {
+            $this->dncModel->addDncForContact($contact->getId(), $channel, $dncReason, $comments);
         }
     }
 
@@ -360,7 +361,7 @@ class CallbackSubscriber implements EventSubscriberInterface
         $host = strtolower($parts['host']);
 
         // Disallow IPs and localhost
-        if ($host === 'localhost' || filter_var($host, FILTER_VALIDATE_IP)) {
+        if ('localhost' === $host || filter_var($host, FILTER_VALIDATE_IP)) {
             return false;
         }
 
@@ -372,7 +373,7 @@ class CallbackSubscriber implements EventSubscriberInterface
         // Best-effort: ensure the query indicates ConfirmSubscription
         if (isset($parts['query'])) {
             parse_str($parts['query'], $query);
-            if (isset($query['Action']) && strtolower((string) $query['Action']) === 'confirmsubscription') {
+            if (isset($query['Action']) && 'confirmsubscription' === strtolower((string) $query['Action'])) {
                 return true;
             }
         }
