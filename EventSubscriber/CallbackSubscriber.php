@@ -321,6 +321,7 @@ class CallbackSubscriber implements EventSubscriberInterface
             if ('soft bounce' === $dnc->getChannel()) {
                 $this->dncModel->updateDncRecord($dnc, $contact, 'soft bounce', $dncReason, $comments);
                 $this->leadModel->saveEntity($contact);
+                $this->dncModel->getDncRepo()->saveEntity($dnc);
                 $softBounceUpdated = true;
                 break;
             }
